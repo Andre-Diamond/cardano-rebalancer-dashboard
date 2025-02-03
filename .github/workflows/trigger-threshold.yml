@@ -1,0 +1,17 @@
+name: Trigger Check Threshold
+
+on:
+  # schedule:
+    # This cron expression will trigger the action every 30 minutes.
+    # - cron: '*/30 * * * *'
+  workflow_dispatch:  # Allows you to manually trigger the action from the GitHub UI.
+
+jobs:
+  trigger-threshold:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger the check-threshold endpoint
+        run: |
+          # Replace ${{ secrets.DEPLOYMENT_URL }} with your deployed app's base URL
+          # For example: https://myapp.vercel.app
+          curl -X GET "${{ secrets.DEPLOYMENT_URL }}/api/check-threshold"
