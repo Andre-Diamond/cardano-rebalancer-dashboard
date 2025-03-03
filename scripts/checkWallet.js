@@ -1,3 +1,4 @@
+// ../scripts/checkWallet.js
 const { getWalletBalance, sendDiscordNotification } = require("../lib/wallet");
 require("dotenv").config();
 
