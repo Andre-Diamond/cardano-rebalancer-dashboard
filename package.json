@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "wallet:check": "node scripts/checkWallet.js",
+    "wallet:check": "ts-node scripts/checkWallet.ts",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
