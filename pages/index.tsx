@@ -1,17 +1,17 @@
 // ../pages/index.tsx
-
 import React from "react";
 import { useQuery, useMutation, QueryClient, QueryClientProvider } from "react-query";
 import { apiRequest } from "../lib/apiRequest";
 import BalanceChart from "../components/BalanceChart";
 import BalanceStatus from "../components/BalanceStatus";
 import WalletGrowthChart from "../components/WalletGrowthChart";
+import WalletSnapshotsTable from "../components/WalletSnapshotsTable";
 import Card from "../components/Card";
 import Button from "../components/Button";
 import Skeleton from "../components/Skeleton";
 import toast from "react-hot-toast";
 import { WalletBalance } from "../types/wallet";
-import styles from "../styles/Dashboard.module.css"; 
+import styles from "../styles/Dashboard.module.css";
 
 // Create a QueryClient instance
 const queryClient = new QueryClient();
@@ -33,16 +33,14 @@ const Dashboard = () => {
     },
   });
 
-  const { data: balance, isLoading } = useQuery<WalletBalance>(
-    "walletBalance",
-    () => apiRequest("/api/wallet/balance", { method: "GET" }),
-    {
+  const { data: balance, isLoading } = useQuery<WalletBalance>("walletBalance", () =>
+    apiRequest("/api/wallet/balance", { method: "GET" }), {
       refetchInterval: 600000, // Refresh every 10 minutes
       retry: 1,
       onError: (err) => {
         console.error("Balance fetch error:", err);
         toast.error("Failed to load wallet balance. Please try again later.");
-      },
+      }
     }
   );
 
@@ -113,6 +111,9 @@ const Dashboard = () => {
 
       <div className={styles.section}>
         <WalletGrowthChart />
+      </div>
+      <div className={styles.section}>
+        <WalletSnapshotsTable />
       </div>
     </div>
   );
