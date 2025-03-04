@@ -1,0 +1,78 @@
+/* Dashboard.module.css */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.heading {
+  font-size: 1.875rem; /* roughly equivalent to text-3xl */
+  font-weight: 700;
+}
+
+.gridTwoColumns {
+  display: grid;
+  gap: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .gridTwoColumns {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.cardGrid {
+  display: grid;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .cardGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.section {
+  margin-top: 1.5rem;
+}
+
+/* Optional extra styles for inner card content */
+.cardPadding {
+  padding: 1.5rem;
+}
+
+.errorHeading {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.cardHeading {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.balanceDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.balanceRow {
+  display: flex;
+  justify-content: space-between;
+}
+
+/* Skeleton component styling */
+.skeletonBox {
+  height: 300px;
+}

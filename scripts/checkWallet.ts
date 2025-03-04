@@ -1,4 +1,5 @@
 // ../scripts/checkWallet.ts
+
 import { getWalletBalance, sendDiscordNotification } from "../lib/wallet";
 import dotenv from "dotenv";
 dotenv.config();

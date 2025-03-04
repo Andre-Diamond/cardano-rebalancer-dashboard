@@ -1,4 +1,7 @@
+// ../components/Card.tsx
+
 import React from "react";
+import styles from "../styles/Card.module.css";
 
 interface Props {
   children: React.ReactNode;
@@ -6,11 +9,7 @@ interface Props {
 }
 
 const Card: React.FC<Props> = ({ children, className = "" }) => {
-  return (
-    <div className={`border rounded shadow p-4 ${className}`}>
-      {children}
-    </div>
-  );
+  return <div className={`${styles.card} ${className}`}>{children}</div>;
 };
 
 export default Card;

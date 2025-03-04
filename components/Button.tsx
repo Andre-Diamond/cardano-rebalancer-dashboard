@@ -1,4 +1,7 @@
+// ../components/Button.tsx
+
 import React from "react";
+import styles from "../styles/Button.module.css";
 
 interface Props {
   onClick: () => void;
@@ -8,11 +11,7 @@ interface Props {
 
 const Button: React.FC<Props> = ({ onClick, disabled, children }) => {
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className="px-4 py-2 bg-blue-500 text-white rounded disabled:opacity-50"
-    >
+    <button onClick={onClick} disabled={disabled} className={styles.button}>
       {children}
     </button>
   );

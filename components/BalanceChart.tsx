@@ -1,5 +1,8 @@
+// ../components/BalanceChart.tsx
+
 import React from "react";
 import { WalletBalance } from "../types/wallet";
+import styles from "../styles/BalanceChart.module.css";
 
 interface Props {
   balance: WalletBalance;
@@ -7,9 +10,9 @@ interface Props {
 
 const BalanceChart: React.FC<Props> = ({ balance }) => {
   return (
-    <div className="border p-4">
-      <h2 className="text-xl font-semibold mb-2">Balance Chart</h2>
-      <div>
+    <div className={styles.container}>
+      <h2 className={styles.title}>Balance Chart</h2>
+      <div className={styles.chart}>
         <p>ADA: {balance.adaPercentage.toFixed(2)}%</p>
         <p>DJED: {balance.djedPercentage.toFixed(2)}%</p>
       </div>

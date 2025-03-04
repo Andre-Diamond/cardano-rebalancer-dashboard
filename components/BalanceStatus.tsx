@@ -1,5 +1,8 @@
+// ../components/BalanceStatus.tsx
+
 import React from "react";
 import { WalletBalance } from "../types/wallet";
+import styles from "../styles/BalanceStatus.module.css";
 
 interface Props {
   balance: WalletBalance;
@@ -7,15 +10,16 @@ interface Props {
 
 const BalanceStatus: React.FC<Props> = ({ balance }) => {
   return (
-    <div className="border p-4">
-      <h2 className="text-xl font-semibold mb-2">Balance Status</h2>
+    <div className={styles.container}>
+      <h2 className={styles.title}>Balance Status</h2>
       {balance.rebalanceAmount ? (
-        <p>
-          Swap {balance.rebalanceAmount.amount.toFixed(2)} {balance.rebalanceAmount.from}
-          (≈${balance.rebalanceAmount.usdValue.toFixed(2)}) to {balance.rebalanceAmount.from === 'ADA' ? 'DJED' : 'ADA'}
+        <p className={styles.message}>
+          Swap {balance.rebalanceAmount.amount.toFixed(2)} {balance.rebalanceAmount.from} 
+          (≈${balance.rebalanceAmount.usdValue.toFixed(2)}) to{" "}
+          {balance.rebalanceAmount.from === "ADA" ? "DJED" : "ADA"}
         </p>
       ) : (
-        <p>Balance is within threshold</p>
+        <p className={styles.message}>Balance is within threshold</p>
       )}
     </div>
   );

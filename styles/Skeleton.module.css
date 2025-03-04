@@ -1,0 +1,24 @@
+.skeleton {
+  background-color: #e0e0e0;
+  animation: pulse 1.5s infinite;
+  border-radius: 4px;
+}
+
+/* Dark mode styling */
+@media (prefers-color-scheme: dark) {
+  .skeleton {
+    background-color: #555;
+  }
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+  100% {
+    opacity: 1;
+  }
+}

@@ -1,3 +1,5 @@
+// ../types/wallet.ts
+
 export interface BalanceDetail {
   amount: number;
   usdValue: number;
