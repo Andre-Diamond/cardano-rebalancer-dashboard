@@ -1,5 +1,8 @@
+// ../lib/wallet.ts
+
 import axios from "axios";
 import { type WalletBalance } from "../types/wallet";
+import { saveWalletSnapshotIfChanged } from "../lib/snapshot";
 
 interface Asset {
   policy_id: string;
@@ -25,14 +28,12 @@ export async function getWalletBalance(
   force: boolean = false
 ): Promise<WalletBalance> {
   try {
-    //console.log(`Fetching ADA balance for address: ${address}`);
     // Fetch ADA balance
     const adaResponse = await koiosApi.post('/address_info', {
       _addresses: [address]
     });
     const adaAmount = parseInt(adaResponse.data[0]?.balance || "0") / 1000000;
 
-    //console.log(`Fetching DJED balance for address: ${address}`);
     // Fetch DJED balance
     const assetResponse = await koiosApi.post('/address_assets', {
       _addresses: [address]
@@ -47,23 +48,12 @@ export async function getWalletBalance(
       }
     }
 
-    /*console.log('Looking for DJED token among assets:',
-      assets.map(a => ({
-        policy_id: a.policy_id,
-        asset_name: a.asset_name,
-        quantity: a.quantity
-      }))
-    );*/
-
     const djedToken = assets.find(
       (asset: Asset) =>
         asset.policy_id === DJED_POLICY_ID &&
         asset.asset_name === DJED_ASSET_NAME
     );
-    //console.log('Found DJED token:', djedToken);
-
     const djedAmount = djedToken ? parseInt(djedToken.quantity) / Math.pow(10, 6) : 0;
-    //console.log('Calculated DJED amount:', djedAmount);
 
     const priceResponse = await axios.get("https://api.coingecko.com/api/v3/simple/price?ids=cardano&vs_currencies=usd");
     const adaPrice = priceResponse.data.cardano.usd;
@@ -74,7 +64,7 @@ export async function getWalletBalance(
     const totalUsdValue = adaUsdValue + djedUsdValue;
 
     if (totalUsdValue === 0) {
-      return {
+      const emptyBalance: WalletBalance = {
         ada: { amount: 0, usdValue: 0 },
         djed: { amount: 0, usdValue: 0 },
         totalUsdValue: 0,
@@ -83,13 +73,16 @@ export async function getWalletBalance(
         threshold: 10,
         rebalanceAmount: undefined
       };
+      // Save snapshot for zero balance (if needed) and return.
+      await saveWalletSnapshotIfChanged(emptyBalance);
+      return emptyBalance;
     }
 
     const adaPercentage = (adaUsdValue / totalUsdValue) * 100;
     const djedPercentage = (djedUsdValue / totalUsdValue) * 100;
     const threshold = 10;
 
-    // Always compute the "real" rebalance amount
+    // Compute the rebalance amount based on deviation from a 50/50 split.
     const targetUsd = totalUsdValue / 2;
     const computedRebalanceAmount = 
       adaUsdValue > djedUsdValue
@@ -104,11 +97,12 @@ export async function getWalletBalance(
             usdValue: djedUsdValue - targetUsd
           };
 
-    // Return the computed rebalance amount if forced or if the deviation exceeds the threshold
+    // Determine whether to trigger a rebalance alert.
     const isThresholdMet = Math.abs(50 - adaPercentage) > threshold;
     const rebalanceAmount = (force || isThresholdMet) ? computedRebalanceAmount : undefined;
 
-    return {
+    // Prepare the wallet balance object.
+    const walletBalance: WalletBalance = {
       ada: { amount: adaAmount, usdValue: adaUsdValue },
       djed: { amount: djedAmount, usdValue: djedUsdValue },
       totalUsdValue,
@@ -117,6 +111,11 @@ export async function getWalletBalance(
       threshold,
       rebalanceAmount
     };
+
+    // Execute snapshot update to check if the wallet state has changed.
+    await saveWalletSnapshotIfChanged(walletBalance);
+
+    return walletBalance;
   } catch (error) {
     console.error('Error in getWalletBalance:', error);
     throw error;

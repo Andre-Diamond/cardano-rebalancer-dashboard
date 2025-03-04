@@ -8,6 +8,7 @@ const supabaseKey = process.env.SUPABASE_ANON_PUBLIC_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function saveWalletSnapshotIfChanged(balance: WalletBalance) {
+  console.log("Checking if a new snapshot is needed...");
   // Query the most recent snapshot
   const { data, error } = await supabase
     .from('wallet_snapshots')
