@@ -25,4 +25,6 @@ jobs:
           KOIOS_API_KEY: ${{ secrets.KOIOS_API_KEY }}
           WALLET_ADDRESS: ${{ secrets.WALLET_ADDRESS }}
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_PUBLIC_KEY: ${{ secrets.SUPABASE_ANON_PUBLIC_KEY }}
         run: npm run wallet:check
