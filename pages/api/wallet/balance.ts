@@ -4,6 +4,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getWalletBalance } from "../../../lib/wallet";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  res.setHeader('Cache-Control', 'no-store');
   try {
     const balance = await getWalletBalance();
     res.status(200).json(balance);
@@ -12,3 +13,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.status(500).json({ error: "Failed to fetch wallet balance" });
   }
 }
+

@@ -33,9 +33,13 @@ const Dashboard = () => {
     },
   });
 
-  const { data: balance, isLoading } = useQuery<WalletBalance>("walletBalance", () =>
-    apiRequest("/api/wallet/balance", { method: "GET" }), {
-      refetchInterval: 600000, // Refresh every 10 minutes
+  const { data: balance, isLoading } = useQuery<WalletBalance>(
+    "walletBalance", 
+    () => apiRequest("/api/wallet/balance", { method: "GET" }), 
+    {
+      staleTime: 0,
+      refetchOnMount: true,
+      refetchInterval: 600000,
       retry: 1,
       onError: (err) => {
         console.error("Balance fetch error:", err);
@@ -43,6 +47,7 @@ const Dashboard = () => {
       }
     }
   );
+  
 
   if (isLoading) {
     return (
