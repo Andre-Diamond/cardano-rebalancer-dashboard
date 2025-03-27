@@ -8,6 +8,11 @@ const supabaseKey = process.env.SUPABASE_ANON_PUBLIC_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Set cache control headers to prevent caching
+  res.setHeader('Cache-Control', 'no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
   const { data, error } = await supabase
     .from('wallet_snapshots')
     .select('*')

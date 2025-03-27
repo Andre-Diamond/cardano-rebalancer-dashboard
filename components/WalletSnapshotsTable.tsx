@@ -4,11 +4,24 @@ import { useQuery } from "react-query";
 import styles from "../styles/WalletSnapshotsTable.module.css";
 
 const WalletSnapshotsTable: React.FC = () => {
-  const { data, isLoading, error } = useQuery("walletSnapshots", async () => {
-    const res = await fetch("/api/wallet/snapshots");
-    if (!res.ok) throw new Error("Network error");
-    return res.json();
-  });
+  const { data, isLoading, error } = useQuery(
+    "walletSnapshots",
+    async () => {
+      const res = await fetch("/api/wallet/snapshots");
+      if (!res.ok) throw new Error("Network error");
+      return res.json();
+    },
+    {
+      staleTime: 0, // Data is considered stale immediately
+      refetchOnMount: true, // Refetch when component mounts
+      refetchOnWindowFocus: true, // Refetch when window regains focus
+      refetchInterval: 600000, // Refetch every 10 minutes
+      retry: 1,
+      onError: (err) => {
+        console.error("Error fetching snapshots:", err);
+      }
+    }
+  );
 
   if (isLoading) return <div>Loading snapshots...</div>;
   if (error) return <div>Error loading snapshots</div>;
