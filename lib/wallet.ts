@@ -14,6 +14,19 @@ interface Asset {
 const DJED_POLICY_ID = "8db269c3ec630e06ae29f74bc39edd1f87c819f1056206e879a1cd61";
 const DJED_ASSET_NAME = "446a65644d6963726f555344";
 
+async function fetchAdaExchangeRate() {
+  try {
+    const response = await axios.get('https://api.kraken.com/0/public/Ticker?pair=ADAUSD');
+    console.log('Kraken API Response:', response.data);
+    if (response.data.result && response.data.result.ADAUSD) {
+      return parseFloat(response.data.result.ADAUSD.c[0]);
+    }
+  } catch (error) {
+    console.error('Error fetching from Kraken:', error);
+  }
+  return 0;
+}
+
 const koiosApi = axios.create({
   baseURL: 'https://api.koios.rest/api/v1',
   headers: {
@@ -58,10 +71,23 @@ export async function getWalletBalance(
     let adaPrice = 0;
     let isUsingFallbackRate = false;
     try {
-      const priceResponse = await axios.get("https://api.coingecko.com/api/v3/simple/price?ids=cardano&vs_currencies=usd");
-      adaPrice = priceResponse.data.cardano.usd;
+      // Try Kraken API first
+      adaPrice = await fetchAdaExchangeRate();
+
+      // If Kraken fails, try CoinGecko
+      if (!adaPrice) {
+        const priceResponse = await axios.get("https://api.coingecko.com/api/v3/simple/price?ids=cardano&vs_currencies=usd");
+        adaPrice = priceResponse.data.cardano.usd;
+      }
+
+      // If both APIs fail, use fallback
+      if (!adaPrice) {
+        console.warn('Failed to fetch ADA price from both Kraken and CoinGecko, using fallback value');
+        adaPrice = 0.5; // Fallback value in USD
+        isUsingFallbackRate = true;
+      }
     } catch (error: unknown) {
-      console.warn('Failed to fetch ADA price from CoinGecko, using fallback value:', error instanceof Error ? error.message : 'Unknown error');
+      console.warn('Failed to fetch ADA price from all sources, using fallback value:', error instanceof Error ? error.message : 'Unknown error');
       adaPrice = 0.5; // Fallback value in USD
       isUsingFallbackRate = true;
     }
