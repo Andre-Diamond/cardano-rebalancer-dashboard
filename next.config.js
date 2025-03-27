@@ -10,6 +10,15 @@ const nextConfig = {
         }
         return config;
     },
+    // Ensure API routes work properly
+    async rewrites() {
+        return [
+            {
+                source: '/api/:path*',
+                destination: '/api/:path*',
+            },
+        ];
+    },
 };
 
 module.exports = nextConfig; 
