@@ -19,4 +19,5 @@ export interface WalletBalance {
   djedPercentage: number;
   threshold: number;
   rebalanceAmount?: RebalanceAmount;
+  isUsingFallbackRate: boolean;
 }

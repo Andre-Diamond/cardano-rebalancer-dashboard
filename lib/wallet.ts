@@ -55,8 +55,16 @@ export async function getWalletBalance(
     );
     const djedAmount = djedToken ? parseInt(djedToken.quantity) / Math.pow(10, 6) : 0;
 
-    const priceResponse = await axios.get("https://api.coingecko.com/api/v3/simple/price?ids=cardano&vs_currencies=usd");
-    const adaPrice = priceResponse.data.cardano.usd;
+    let adaPrice = 0;
+    let isUsingFallbackRate = false;
+    try {
+      const priceResponse = await axios.get("https://api.coingecko.com/api/v3/simple/price?ids=cardano&vs_currencies=usd");
+      adaPrice = priceResponse.data.cardano.usd;
+    } catch (error: unknown) {
+      console.warn('Failed to fetch ADA price from CoinGecko, using fallback value:', error instanceof Error ? error.message : 'Unknown error');
+      adaPrice = 0.5; // Fallback value in USD
+      isUsingFallbackRate = true;
+    }
     const djedPrice = 1; // DJED is pegged to USD
 
     const adaUsdValue = adaAmount * adaPrice;
@@ -71,7 +79,8 @@ export async function getWalletBalance(
         adaPercentage: 0,
         djedPercentage: 0,
         threshold: 10,
-        rebalanceAmount: undefined
+        rebalanceAmount: undefined,
+        isUsingFallbackRate: false
       };
       // Save snapshot for zero balance (if needed) and return.
       await saveWalletSnapshotIfChanged(emptyBalance);
@@ -84,18 +93,18 @@ export async function getWalletBalance(
 
     // Compute the rebalance amount based on deviation from a 50/50 split.
     const targetUsd = totalUsdValue / 2;
-    const computedRebalanceAmount = 
+    const computedRebalanceAmount =
       adaUsdValue > djedUsdValue
         ? {
-            from: 'ADA' as const,
-            amount: (adaUsdValue - targetUsd) / adaPrice,
-            usdValue: adaUsdValue - targetUsd
-          }
+          from: 'ADA' as const,
+          amount: (adaUsdValue - targetUsd) / adaPrice,
+          usdValue: adaUsdValue - targetUsd
+        }
         : {
-            from: 'DJED' as const,
-            amount: djedUsdValue - targetUsd,
-            usdValue: djedUsdValue - targetUsd
-          };
+          from: 'DJED' as const,
+          amount: djedUsdValue - targetUsd,
+          usdValue: djedUsdValue - targetUsd
+        };
 
     // Determine whether to trigger a rebalance alert.
     const isThresholdMet = Math.abs(50 - adaPercentage) > threshold;
@@ -109,7 +118,8 @@ export async function getWalletBalance(
       adaPercentage,
       djedPercentage,
       threshold,
-      rebalanceAmount
+      rebalanceAmount,
+      isUsingFallbackRate
     };
 
     // Execute snapshot update to check if the wallet state has changed.
@@ -144,6 +154,11 @@ export async function sendDiscordNotification(
           name: "Rebalancing Required",
           value: `Swap ${amount.toFixed(2)} ${from} (≈$${usdValue.toFixed(2)}) to ${from === 'ADA' ? 'DJED' : 'ADA'}`,
           inline: true
+        },
+        {
+          name: "Exchange Rate Status",
+          value: balance.isUsingFallbackRate ? "⚠️ Using fallback ADA price ($0.50)" : "✅ Using real-time ADA price",
+          inline: false
         }
       ],
       timestamp: new Date().toISOString()
