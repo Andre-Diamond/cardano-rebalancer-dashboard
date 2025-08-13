@@ -102,7 +102,7 @@
 
 .holdingsGrid {
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr 0.8fr 0.8fr;
+    grid-template-columns: 2fr 1fr 1fr 1fr 0.8fr 0.8fr;
     gap: 8px;
     margin-top: 8px;
 }

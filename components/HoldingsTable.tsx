@@ -12,6 +12,7 @@ export default function HoldingsTable({ title, data, totalUsd, walletUsdDenom, p
             <div className={styles.holdingsGrid}>
                 <div className={styles.headerCell}>Token</div>
                 <div className={styles.headerCell}>Quantity</div>
+                <div className={styles.headerCell}>Rate (USD)</div>
                 <div className={styles.headerCell}>USD</div>
                 <div className={styles.headerCell}>USD %</div>
                 <div className={styles.headerCell}>Portfolio %</div>
@@ -19,6 +20,14 @@ export default function HoldingsTable({ title, data, totalUsd, walletUsdDenom, p
                     <React.Fragment key={i}>
                         <div>{h.ticker || h.name || (h.is_ada ? 'ADA' : 'Token')}</div>
                         <div>{Number(h.quantity).toFixed(6)}</div>
+                        <div>
+                            {(() => {
+                                const qty = Number(h.quantity) || 0;
+                                const usd = Number(h.usd_value) || 0;
+                                if (qty <= 0 || usd <= 0) return '-';
+                                return `$${(usd / qty).toFixed(6)}`;
+                            })()}
+                        </div>
                         <div>${Number(h.usd_value || 0).toFixed(2)}</div>
                         <div>
                             {(() => {

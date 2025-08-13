@@ -8,11 +8,14 @@ import { useData } from '../lib/dataContext';
 import WalletPortfolioSummary from './WalletPortfolioSummary';
 import HoldingsTable from './HoldingsTable';
 import WalletTargetsEditor from './WalletTargetsEditor';
+import WalletCharts from './WalletCharts';
 
 export default function WalletCard({ wallet }: { wallet: Wallet }) {
-    const { getHoldings, getPortfolio, invalidatePortfolio, invalidateHoldings } = useData();
+    const { getHoldings, getPortfolio, getSnapshots, invalidatePortfolio, invalidateHoldings } = useData();
 
     const [editing, setEditing] = React.useState(false);
+    const [snapshots, setSnapshots] = React.useState<import('../types').WalletSnapshotRow[] | null>(null);
+    const [showCharts, setShowCharts] = React.useState(false);
     const [portfolioRows, setPortfolioRows] = React.useState<PortfolioRow[] | null>(null);
     const [allHoldings, setAllHoldings] = React.useState<HoldingsResponse | null>(null);
 
@@ -23,7 +26,8 @@ export default function WalletCard({ wallet }: { wallet: Wallet }) {
             try {
                 const [pr, hs] = await Promise.all([
                     getPortfolio(wallet.id),
-                    getHoldings(wallet.id, false),
+                    // Prefer cached holdings (and thereby cached rates) when entering edit mode
+                    getHoldings(wallet.id, false, true),
                 ]);
                 if (!cancelled) {
                     setPortfolioRows(pr);
@@ -38,6 +42,19 @@ export default function WalletCard({ wallet }: { wallet: Wallet }) {
         })();
         return () => { cancelled = true; };
     }, [editing, wallet.id, getPortfolio, getHoldings]);
+
+    React.useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const s = await getSnapshots(wallet.id);
+                if (!cancelled) setSnapshots(s);
+            } catch {
+                if (!cancelled) setSnapshots([]);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [wallet.id, getSnapshots]);
 
     const [targets, setTargets] = React.useState<Record<string, number>>({});
     React.useEffect(() => {
@@ -134,7 +151,22 @@ export default function WalletCard({ wallet }: { wallet: Wallet }) {
                 </div>
             </div>
             {!editing && (
-                <WalletPortfolioSummary walletId={wallet.id} />
+                <>
+                    <WalletPortfolioSummary walletId={wallet.id} />
+                    {Array.isArray(snapshots) && snapshots.length > 0 && (
+                        <div>
+                            {!showCharts && (
+                                <button onClick={() => setShowCharts(true)}>Show Charts</button>
+                            )}
+                            {showCharts && (
+                                <>
+                                    <button onClick={() => setShowCharts(false)}>Minimise Charts</button>
+                                    <WalletCharts snapshots={snapshots} />
+                                </>
+                            )}
+                        </div>
+                    )}
+                </>
             )}
             {editing && (
                 <div className={styles.editSection}>

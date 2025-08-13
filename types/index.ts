@@ -56,11 +56,13 @@ export type DataContextValue = {
     wallets: Wallet[] | null;
     rates: Rates;
     getWallets: () => Promise<Wallet[]>;
-    getHoldings: (walletId: string, portfolioOnly?: boolean) => Promise<HoldingsResponse>;
+    getHoldings: (walletId: string, portfolioOnly?: boolean, preferCache?: boolean) => Promise<HoldingsResponse>;
     getPortfolio: (walletId: string) => Promise<PortfolioRow[]>;
+    getSnapshots: (walletId: string) => Promise<WalletSnapshotRow[]>;
     invalidateWallets: () => void;
     invalidateHoldings: (walletId: string) => void;
     invalidatePortfolio: (walletId: string) => void;
+    invalidateSnapshots: (walletId: string) => void;
     refreshWallets: () => Promise<Wallet[]>;
 };
 
@@ -97,6 +99,14 @@ export type SnapshotHolding = {
     is_ada?: boolean;
     decimals?: number;
     name?: string | null;
+};
+
+// API response type for wallet snapshots
+export type WalletSnapshotRow = {
+    snapshot_date: string; // YYYY-MM-DD
+    taken_at: string; // ISO timestamp
+    total_usd_value: number;
+    holdings: SnapshotHolding[];
 };
 
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { apiRequest } from './apiRequest';
 import type { Wallet, Rates, HoldingsResponse, PortfolioRow, DataContextValue } from '../types';
+import type { WalletSnapshotRow } from '../types';
 
 const DataContext = React.createContext<DataContextValue | undefined>(undefined);
 
@@ -46,6 +47,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         rates: 'data_rates',
         holdings: (walletId: string, portfolioOnly: boolean) => `data_holdings_${walletId}_${portfolioOnly ? 'portfolio' : 'all'}`,
         portfolio: (walletId: string) => `data_portfolio_${walletId}`,
+        snapshots: (walletId: string) => `data_snapshots_${walletId}`,
     }), []);
 
     // Hydrate from localStorage on mount
@@ -76,9 +78,20 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         return fetchWallets();
     }, [localKeys, wallets, rates.updatedAt, fetchWallets]);
 
-    const getHoldings = React.useCallback(async (walletId: string, portfolioOnly: boolean = false): Promise<HoldingsResponse> => {
+    const getHoldings = React.useCallback(async (walletId: string, portfolioOnly: boolean = false, preferCache: boolean = false): Promise<HoldingsResponse> => {
         const key = localKeys.holdings(walletId, portfolioOnly);
         const cached = safeGetLocalStorage<HoldingsResponse>(key);
+        // If caller prefers cache, return it immediately when available (even if stale)
+        if (preferCache && cached) {
+            if (typeof cached.data?.ada_usd === 'number') {
+                setRates(() => {
+                    const next: Rates = { adaUsd: cached.data.ada_usd, isFallback: Boolean(cached.data.is_using_fallback_rate), updatedAt: cached.ts };
+                    safeSetLocalStorage(localKeys.rates, next);
+                    return next;
+                });
+            }
+            return cached.data;
+        }
         if (cached && isFresh(cached.ts)) {
             // also sync rates from cached holdings
             if (typeof cached.data?.ada_usd === 'number') {
@@ -110,6 +123,15 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         return res;
     }, [localKeys]);
 
+    const getSnapshots = React.useCallback(async (walletId: string): Promise<WalletSnapshotRow[]> => {
+        const key = localKeys.snapshots(walletId);
+        const cached = safeGetLocalStorage<WalletSnapshotRow[]>(key);
+        if (cached && isFresh(cached.ts, 24 * 60 * 60 * 1000)) return cached.data; // cache for a day
+        const res = await apiRequest<WalletSnapshotRow[]>(`/api/wallets/${walletId}/snapshots`, { method: 'GET' });
+        safeSetLocalStorage(key, res);
+        return res;
+    }, [localKeys]);
+
     const invalidateWallets = React.useCallback(() => {
         if (typeof window !== 'undefined') window.localStorage.removeItem(localKeys.wallets);
     }, [localKeys]);
@@ -125,6 +147,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         if (typeof window !== 'undefined') window.localStorage.removeItem(localKeys.portfolio(walletId));
     }, [localKeys]);
 
+    const invalidateSnapshots = React.useCallback((walletId: string) => {
+        if (typeof window !== 'undefined') window.localStorage.removeItem(localKeys.snapshots(walletId));
+    }, [localKeys]);
+
     const refreshWallets = React.useCallback(async (): Promise<Wallet[]> => {
         invalidateWallets();
         return fetchWallets();
@@ -136,11 +162,13 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         getWallets,
         getHoldings,
         getPortfolio,
+        getSnapshots,
         invalidateWallets,
         invalidateHoldings,
         invalidatePortfolio,
+        invalidateSnapshots,
         refreshWallets,
-    }), [wallets, rates, getWallets, getHoldings, getPortfolio, invalidateWallets, invalidateHoldings, invalidatePortfolio, refreshWallets]);
+    }), [wallets, rates, getWallets, getHoldings, getPortfolio, getSnapshots, invalidateWallets, invalidateHoldings, invalidatePortfolio, invalidateSnapshots, refreshWallets]);
 
     return (
         <DataContext.Provider value={value}>{children}</DataContext.Provider>

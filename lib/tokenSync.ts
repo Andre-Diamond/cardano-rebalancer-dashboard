@@ -6,9 +6,6 @@ const supabaseUrl = process.env.SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_ANON_PUBLIC_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-const DJED_POLICY_ID = "8db269c3ec630e06ae29f74bc39edd1f87c819f1056206e879a1cd61";
-const DJED_ASSET_NAME = "446a65644d6963726f555344";
-
 function normalizeDecimals(decimals: unknown, fallback: number = 0): number {
     if (typeof decimals === 'number' && isFinite(decimals)) return decimals;
     if (typeof decimals === 'string' && decimals.trim() !== '' && !isNaN(Number(decimals))) return Number(decimals);
@@ -26,16 +23,6 @@ export async function ensureCoreTokensSeeded() {
         decimals: 6,
         is_ada: true
     }, { onConflict: 'is_ada' });
-
-    // DJED row
-    await supabase.from('tokens').upsert({
-        policy_id: DJED_POLICY_ID,
-        asset_name: DJED_ASSET_NAME,
-        ticker: 'DJED',
-        name: 'DJED MicroUSD',
-        decimals: 6,
-        is_ada: false
-    }, { onConflict: 'policy_id,asset_name' });
 }
 
 export async function syncWalletTokensByAddress(walletAddress: string, options?: { fungibleOnly?: boolean }) {
