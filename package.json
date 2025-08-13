@@ -4,7 +4,7 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
-    "wallet:check": "ts-node scripts/checkWallet.ts",
+    "snapshot:daily": "ts-node scripts/dailySnapshot.ts",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
