@@ -3,7 +3,8 @@
 export type Wallet = {
     id: string;
     name: string;
-    address: string;
+    address: string | null;
+    stake_address?: string | null;
     is_active: boolean;
     threshold_percent: number;
     config: Record<string, unknown>;
@@ -107,6 +108,27 @@ export type WalletSnapshotRow = {
     taken_at: string; // ISO timestamp
     total_usd_value: number;
     holdings: SnapshotHolding[];
+};
+
+
+// Portfolio deviation / targets-related lightweight types
+export type WalletInfo = {
+    id: string;
+    name: string | null;
+    threshold_percent: number | null;
+    config?: Record<string, unknown> | null;
+};
+
+export type TargetTokenInfo = {
+    ticker: string | null;
+    name: string | null;
+    is_ada: boolean | null;
+};
+
+export type WalletPortfolioTargetRow = {
+    token_id: string;
+    target_weight_percent: number;
+    tokens: TargetTokenInfo | null;
 };
 
 

@@ -25,21 +25,18 @@ export async function ensureCoreTokensSeeded() {
     }, { onConflict: 'is_ada' });
 }
 
-export async function syncWalletTokensByAddress(walletAddress: string, options?: { fungibleOnly?: boolean }) {
-    if (!walletAddress) throw new Error('walletAddress is required');
+export async function syncWalletTokensByStake(stakeAddress: string, options?: { fungibleOnly?: boolean }) {
+    if (!stakeAddress) throw new Error('stakeAddress is required');
 
     await ensureCoreTokensSeeded();
 
-    // Fetch address assets from Koios
-    const assetResponse = await koiosApi.post('/address_assets', { _addresses: [walletAddress] });
+    // Fetch account assets from Koios
+    const assetResponse = await koiosApi.post('/account_assets', { _stake_addresses: [stakeAddress] });
 
     let assets: KoiosAsset[] = [];
     if (Array.isArray(assetResponse.data)) {
-        if (assetResponse.data.length > 0 && assetResponse.data[0].asset_list) {
-            assets = assetResponse.data[0].asset_list;
-        } else {
-            assets = assetResponse.data as KoiosAsset[];
-        }
+        type AccountAsset = { policy_id: string; asset_name: string; quantity: string };
+        assets = (assetResponse.data as AccountAsset[]).map((a: AccountAsset) => ({ policy_id: a.policy_id, asset_name: a.asset_name, quantity: a.quantity }));
     }
 
     let nonAdaAssets = assets.filter(a => a.policy_id && a.asset_name);

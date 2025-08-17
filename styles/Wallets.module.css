@@ -71,7 +71,7 @@
 
 .targetsGrid {
     display: grid;
-    grid-template-columns: 1fr 100px;
+    grid-template-columns: 1fr 100px 120px;
     gap: 8px;
     align-items: center;
 }

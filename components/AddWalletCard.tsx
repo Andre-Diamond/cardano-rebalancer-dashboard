@@ -8,15 +8,17 @@ import styles from '../styles/Wallets.module.css';
 export default function AddWalletCard({ onAdded }: { onAdded?: () => void }) {
     const [newName, setNewName] = React.useState('');
     const [newAddress, setNewAddress] = React.useState('');
+    const [newStakeAddress, setNewStakeAddress] = React.useState('');
 
     const addWallet = useMutation({
-        mutationFn: (payload: { name: string; address: string }) => apiRequest<Wallet>('/api/wallets', {
+        mutationFn: (payload: { name: string; address?: string; stake_address?: string }) => apiRequest<Wallet>('/api/wallets', {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
         }),
         onSuccess: () => {
             toast.success('Wallet added');
             setNewName('');
             setNewAddress('');
+            setNewStakeAddress('');
             onAdded?.();
         },
         onError: (e: unknown) => {
@@ -29,8 +31,9 @@ export default function AddWalletCard({ onAdded }: { onAdded?: () => void }) {
             <h3>Add Wallet</h3>
             <div className={styles.addWalletForm}>
                 <input placeholder="Name" value={newName} onChange={e => setNewName(e.target.value)} className={styles.inputName} />
-                <input placeholder="Address" value={newAddress} onChange={e => setNewAddress(e.target.value)} className={styles.inputAddress} />
-                <button onClick={() => addWallet.mutate({ name: newName, address: newAddress })} disabled={addWallet.isLoading || !newName || !newAddress}>Add</button>
+                <input placeholder="Payment/Base Address (optional)" value={newAddress} onChange={e => setNewAddress(e.target.value)} className={styles.inputAddress} />
+                <input placeholder="Stake Address (optional)" value={newStakeAddress} onChange={e => setNewStakeAddress(e.target.value)} className={styles.inputAddress} />
+                <button onClick={() => addWallet.mutate({ name: newName, address: newAddress || undefined, stake_address: newStakeAddress || undefined })} disabled={addWallet.isLoading || !newName || (!newAddress && !newStakeAddress)}>Add</button>
             </div>
         </div>
     );

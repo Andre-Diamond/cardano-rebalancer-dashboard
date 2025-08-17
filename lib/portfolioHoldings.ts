@@ -1,19 +1,44 @@
 import { koiosApi } from './koios';
-import { fetchAdaUsd } from './pricing';
-import { fetchKrakenUsdPricesForTickers } from './tokenPricing';
+import { getAdaUsdCached } from './pricing';
+import { getUsdPricesForTickersCached } from './tokenPricing';
 import type { SnapshotHolding } from '../types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-export async function computePortfolioSnapshotHoldings(supabase: SupabaseClient, walletId: string, address: string) {
-    const { price: adaUsd, isFallback } = await fetchAdaUsd();
+export async function computePortfolioSnapshotHoldings(
+    supabase: SupabaseClient,
+    walletId: string,
+    addressOrStake: string,
+    options?: { isStake?: boolean; pricing?: { adaUsd: number; isFallbackAda: boolean; usdByTicker: Map<string, number> } }
+) {
+    const useCachedAda = options?.pricing?.adaUsd && typeof options.pricing.adaUsd === 'number';
+    const adaInfo = useCachedAda
+        ? { price: options!.pricing!.adaUsd, isFallback: Boolean(options!.pricing!.isFallbackAda) }
+        : await getAdaUsdCached();
+    const adaUsd = adaInfo.price;
+    const isFallback = adaInfo.isFallback;
     const djedUsd = 1;
 
-    const adaResp = await koiosApi.post('/address_info', { _addresses: [address] });
-    const adaAmount = parseInt(adaResp.data?.[0]?.balance || '0', 10) / 1_000_000;
+    let stakeAddress = addressOrStake;
+    if (!options?.isStake) {
+        // Resolve stake address from base address
+        try {
+            const info = await koiosApi.post('/address_info', { _addresses: [addressOrStake] });
+            const resolved = Array.isArray(info.data) && info.data[0] && info.data[0].stake_address ? String(info.data[0].stake_address) : null;
+            if (!resolved) throw new Error('Stake address not found for base address');
+            stakeAddress = resolved;
+        } catch {
+            throw new Error('Stake address unavailable for wallet');
+        }
+    }
 
-    const assetResp = await koiosApi.post('/address_assets', { _addresses: [address] });
+    const accResp = await koiosApi.post('/account_info', { _stake_addresses: [stakeAddress] });
+    const total = accResp?.data?.[0]?.total_balance ? String(accResp.data[0].total_balance) : '0';
+    const adaAmount = parseInt(total, 10) / 1_000_000;
+
+    const assetResp = await koiosApi.post('/account_assets', { _stake_addresses: [stakeAddress] });
+    type AccountAsset = { policy_id: string; asset_name: string; quantity: string };
     const assets: Array<{ policy_id: string; asset_name: string; quantity: string }> = Array.isArray(assetResp.data)
-        ? (assetResp.data[0]?.asset_list ? assetResp.data[0].asset_list : assetResp.data)
+        ? (assetResp.data as AccountAsset[]).map((r: AccountAsset) => ({ policy_id: r.policy_id, asset_name: r.asset_name, quantity: r.quantity }))
         : [];
 
     const sel = await supabase
@@ -47,7 +72,9 @@ export async function computePortfolioSnapshotHoldings(supabase: SupabaseClient,
     const tickers = (tokens || [])
         .filter((t) => t.ticker !== null && !t.is_ada)
         .map((t) => String(t.ticker).toUpperCase());
-    const usdByTicker = await fetchKrakenUsdPricesForTickers(tickers);
+    const usdByTicker = options?.pricing?.usdByTicker
+        ? options.pricing.usdByTicker
+        : await getUsdPricesForTickersCached(tickers);
 
     for (const a of (assets || [])) {
         const key = `${a.policy_id}:${a.asset_name}`;

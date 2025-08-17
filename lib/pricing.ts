@@ -21,4 +21,17 @@ export async function fetchAdaUsd(): Promise<{ price: number; isFallback: boolea
     return { price: adaPrice, isFallback: isUsingFallbackRate };
 }
 
+// Simple in-memory cache for ADA price with TTL
+let cachedAdaPrice: { updatedAt: number; price: number; isFallback: boolean } | null = null;
+
+export async function getAdaUsdCached(ttlMs: number = 60_000): Promise<{ price: number; isFallback: boolean }> {
+    const now = Date.now();
+    if (cachedAdaPrice && (now - cachedAdaPrice.updatedAt) < ttlMs) {
+        return { price: cachedAdaPrice.price, isFallback: cachedAdaPrice.isFallback };
+    }
+    const fresh = await fetchAdaUsd();
+    cachedAdaPrice = { updatedAt: now, price: fresh.price, isFallback: fresh.isFallback };
+    return fresh;
+}
+
 

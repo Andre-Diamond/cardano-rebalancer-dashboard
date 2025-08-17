@@ -1,6 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createClient } from "@supabase/supabase-js";
 import { computePortfolioSnapshotHoldings } from "../../../../lib/portfolioHoldings";
+import { koiosApi } from "../../../../lib/koios";
+import { notifyIfDeviationsExceedThreshold } from "../../../../lib/portfolioDeviation";
 
 const supabaseUrl = process.env.SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_ANON_PUBLIC_KEY || '';
@@ -19,12 +21,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const { data: wallet, error: wErr } = await supabase
         .from('wallets')
-        .select('id, address')
+        .select('id, name, address, stake_address, threshold_percent, config')
         .eq('id', walletId)
         .single();
     if (wErr || !wallet) return res.status(404).json({ error: 'Wallet not found' });
 
-    const { holdings, total_usd_value, is_using_fallback_rate, ada_usd } = await computePortfolioSnapshotHoldings(supabase, wallet.id as string, wallet.address as string);
+    // Resolve and persist stake address if missing
+    let stakeAddr: string | null = (wallet as { stake_address?: string | null }).stake_address || null;
+    const baseAddr: string | null = (wallet as { address?: string | null }).address || null;
+    if (!stakeAddr && baseAddr) {
+        try {
+            const info = await koiosApi.post('/address_info', { _addresses: [baseAddr] });
+            const resolved = Array.isArray(info.data) && info.data[0] && info.data[0].stake_address ? String(info.data[0].stake_address) : null;
+            if (resolved) {
+                await supabase.from('wallets').update({ stake_address: resolved }).eq('id', (wallet as { id: string }).id);
+                stakeAddr = resolved;
+            }
+        } catch {
+            // ignore
+        }
+    }
+
+    if (!stakeAddr) return res.status(400).json({ error: 'Stake address unavailable for wallet' });
+    const { holdings, total_usd_value, is_using_fallback_rate, ada_usd } = await computePortfolioSnapshotHoldings(
+        supabase,
+        wallet.id as string,
+        stakeAddr,
+        { isStake: true }
+    );
+
+    // Notify deviations vs targets if any exceed threshold
+    const walletInfo: { id: string; name: string | null; threshold_percent: number | null; config?: Record<string, unknown> | null } = {
+        id: wallet.id as string,
+        name: (wallet as { name?: string | null }).name ?? null,
+        threshold_percent: (wallet as { threshold_percent?: number | null }).threshold_percent ?? null,
+        config: (wallet as { config?: Record<string, unknown> | null }).config ?? null
+    };
+    await notifyIfDeviationsExceedThreshold(supabase, walletInfo, holdings, total_usd_value);
     const totalUsdValue = total_usd_value;
 
     // Replace today's snapshot if one exists; else insert new

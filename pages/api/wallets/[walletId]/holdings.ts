@@ -1,8 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createClient } from "@supabase/supabase-js";
 import { koiosApi } from "../../../../lib/koios";
-import { fetchAdaUsd } from "../../../../lib/pricing";
-import { fetchKrakenUsdPricesForTickers } from "../../../../lib/tokenPricing";
+import { getAdaUsdCached } from "../../../../lib/pricing";
+import { getUsdPricesForTickersCached } from "../../../../lib/tokenPricing";
 import type { Token, Holding, KoiosAsset } from "../../../../types";
 
 const supabaseUrl = process.env.SUPABASE_URL || '';
@@ -23,23 +23,42 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const { data: wallet, error: wErr } = await supabase
         .from('wallets')
-        .select('id, address')
+        .select('id, address, stake_address')
         .eq('id', walletId)
         .single();
     if (wErr || !wallet) return res.status(404).json({ error: 'Wallet not found' });
 
-    const { price: adaUsd, isFallback } = await fetchAdaUsd();
+    // Resolve and persist stake address if missing
+    let stakeAddr: string | null = (wallet as { stake_address?: string | null }).stake_address || null;
+    const baseAddr: string | null = (wallet as { address?: string | null }).address || null;
+    if (!stakeAddr && baseAddr) {
+        try {
+            const info = await koiosApi.post('/address_info', { _addresses: [baseAddr] });
+            const resolved = Array.isArray(info.data) && info.data[0] && info.data[0].stake_address ? String(info.data[0].stake_address) : null;
+            if (resolved) {
+                await supabase.from('wallets').update({ stake_address: resolved }).eq('id', (wallet as { id: string }).id);
+                stakeAddr = resolved;
+            }
+        } catch {
+            // ignore resolution errors, continue without stake address
+        }
+    }
+
+    const { price: adaUsd, isFallback } = await getAdaUsdCached();
     const djedUsd = 1;
 
     // ADA amount
-    const adaResp = await koiosApi.post('/address_info', { _addresses: [wallet.address] });
-    const adaAmount = parseInt(adaResp.data?.[0]?.balance || '0', 10) / 1_000_000;
+    let adaAmount = 0;
+    if (!stakeAddr) return res.status(400).json({ error: 'Stake address unavailable for wallet' });
+    const accResp = await koiosApi.post('/account_info', { _stake_addresses: [stakeAddr] });
+    const total = accResp?.data?.[0]?.total_balance ? String(accResp.data[0].total_balance) : '0';
+    adaAmount = parseInt(total, 10) / 1_000_000;
 
     // Token assets
-    const assetResp = await koiosApi.post('/address_assets', { _addresses: [wallet.address] });
-    const assets: KoiosAsset[] = Array.isArray(assetResp.data)
-        ? (assetResp.data[0]?.asset_list ? assetResp.data[0].asset_list : assetResp.data)
-        : [];
+    let assets: KoiosAsset[] = [];
+    const assetResp = await koiosApi.post('/account_assets', { _stake_addresses: [stakeAddr] });
+    type AccountAsset = { policy_id: string; asset_name: string; quantity: string };
+    assets = Array.isArray(assetResp.data) ? (assetResp.data as AccountAsset[]).map((r: AccountAsset) => ({ policy_id: r.policy_id, asset_name: r.asset_name, quantity: r.quantity })) : [];
 
     // Load tokens registry and portfolio targets (if needed)
     const [{ data: tokens }, targetsResult] = await Promise.all([
@@ -73,9 +92,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Pre-fetch USD prices for tokens with tickers (metadata present)
     const tickers = (tokens || []).filter(t => t.ticker && !t.is_ada).map(t => (t.ticker as string).toUpperCase());
-    console.log(`[holdings] Fetching Kraken USD prices for tickers: ${JSON.stringify(tickers)}`);
-    const usdByTicker = await fetchKrakenUsdPricesForTickers(tickers);
-    console.log(`[holdings] Kraken USD price map: ${JSON.stringify(Object.fromEntries(usdByTicker.entries()))}`);
+    const usdByTicker = await getUsdPricesForTickersCached(tickers);
 
     for (const a of (assets || [])) {
         const key = `${a.policy_id}:${a.asset_name}`;

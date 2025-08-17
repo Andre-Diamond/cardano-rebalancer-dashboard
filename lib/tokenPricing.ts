@@ -102,3 +102,72 @@ export async function fetchKrakenUsdPricesForTickers(tickers: string[]): Promise
 }
 
 
+// Simple in-memory cache for USD prices by ticker with TTL
+let cachedUsdPrices: { updatedAt: number; prices: Map<string, number>; coveredTickers: Set<string> } | null = null;
+let inflightUsdFetch: Promise<Map<string, number>> | null = null;
+let pendingTickers = new Set<string>();
+let inflightStartedAt = 0;
+
+/**
+ * Returns a USD price map for the provided tickers, using an in-memory cache.
+ * If the cache is fresh and contains all requested tickers, it returns a subset.
+ * Otherwise, it refreshes using the union of requested tickers and cached tickers.
+ */
+export async function getUsdPricesForTickersCached(tickers: string[], ttlMs: number = 60_000): Promise<Map<string, number>> {
+    const requested = Array.from(new Set((tickers || []).map(t => (t || '').toUpperCase()).filter(Boolean)));
+    const now = Date.now();
+
+    // If cache fresh and covers all requested, return subset immediately
+    if (cachedUsdPrices && (now - cachedUsdPrices.updatedAt) < ttlMs) {
+        const hasAll = requested.every(t => cachedUsdPrices!.coveredTickers.has(t));
+        if (hasAll) {
+            const out = new Map<string, number>();
+            for (const t of requested) {
+                if (cachedUsdPrices.prices.has(t)) out.set(t, cachedUsdPrices.prices.get(t)!);
+            }
+            return out;
+        }
+    }
+
+    // Coalesce concurrent fetches: accumulate pending tickers and execute a single union fetch
+    for (const t of requested) pendingTickers.add(t);
+    if (inflightUsdFetch && (now - inflightStartedAt) < 10_000) {
+        const result = await inflightUsdFetch;
+        // Return subset for requested
+        const out = new Map<string, number>();
+        for (const t of requested) if (result.has(t)) out.set(t, result.get(t)!);
+        return out;
+    }
+
+    inflightStartedAt = now;
+    const toFetch = Array.from(pendingTickers);
+    pendingTickers = new Set<string>();
+    inflightUsdFetch = (async () => {
+        const base = cachedUsdPrices && (now - cachedUsdPrices.updatedAt) < ttlMs
+            ? new Map<string, number>(cachedUsdPrices.prices)
+            : new Map<string, number>();
+        const newly = await fetchKrakenUsdPricesForTickers(toFetch);
+        for (const [k, v] of newly.entries()) base.set(k, v);
+        // Update cache coverage and timestamp
+        const covered = cachedUsdPrices && (now - cachedUsdPrices.updatedAt) < ttlMs
+            ? new Set<string>([...cachedUsdPrices.coveredTickers, ...toFetch])
+            : new Set<string>(toFetch);
+        cachedUsdPrices = { updatedAt: Date.now(), prices: base, coveredTickers: covered };
+        return base;
+    })();
+
+    try {
+        const result = await inflightUsdFetch;
+        // Return subset for requested
+        const out = new Map<string, number>();
+        for (const t of requested) if (result.has(t)) out.set(t, result.get(t)!);
+        return out;
+    } finally {
+        inflightUsdFetch = null;
+    }
+
+    // Unreachable, but TS types
+    // return new Map<string, number>();
+}
+
+

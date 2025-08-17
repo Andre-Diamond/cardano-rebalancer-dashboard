@@ -2,6 +2,10 @@ import 'dotenv/config';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { computePortfolioSnapshotHoldings } from '../lib/portfolioHoldings';
 import type { SnapshotHolding } from '../types';
+import { notifyIfDeviationsExceedThreshold } from '../lib/portfolioDeviation';
+import { koiosApi } from '../lib/koios';
+import { getAdaUsdCached } from '../lib/pricing';
+import { getUsdPricesForTickersCached } from '../lib/tokenPricing';
 
 // (day boundary helpers removed; using snapshot_date instead)
 
@@ -29,8 +33,14 @@ function areTokenSetsDifferent(a: SnapshotHolding[], b: SnapshotHolding[]): bool
     return false;
 }
 
-async function computeHoldingsForWallet(supabaseAdmin: SupabaseClient, walletId: string, address: string) {
-    return computePortfolioSnapshotHoldings(supabaseAdmin, walletId, address);
+async function computeHoldingsForWallet(
+    supabaseAdmin: SupabaseClient,
+    walletId: string,
+    addressOrStake: string,
+    isStake: boolean,
+    pricing: { adaUsd: number; isFallbackAda: boolean; usdByTicker: Map<string, number> }
+) {
+    return computePortfolioSnapshotHoldings(supabaseAdmin, walletId, addressOrStake, { isStake, pricing });
 }
 
 async function main() {
@@ -48,7 +58,7 @@ async function main() {
     // Load active wallets
     const { data: wallets, error: wErr } = await supabaseAdmin
         .from('wallets')
-        .select('id, address, is_active')
+        .select('id, name, address, stake_address, is_active, threshold_percent, config')
         .eq('is_active', true);
     if (wErr) {
         console.error('Failed to load wallets:', wErr.message);
@@ -58,10 +68,52 @@ async function main() {
     const now = new Date();
     const todayStr = now.toISOString().slice(0, 10); // UTC YYYY-MM-DD
 
-    for (const wallet of wallets || []) {
+    type WalletRow = { id: string; name: string | null; address: string | null; stake_address: string | null; is_active: boolean; threshold_percent: number | null; config?: Record<string, unknown> | null };
+    const walletRows: WalletRow[] = (wallets || []) as WalletRow[];
+
+    // Prefetch ADA price and USD prices for all tickers across all wallets once
+    // We need to collect all tickers: load tokens table (using admin client) and collect tickers present
+    const { data: tokenRows } = await supabaseAdmin
+        .from('tokens')
+        .select('ticker, is_ada');
+    const allTickers = Array.from(new Set(((tokenRows || [])
+        .filter((t: { ticker: string | null; is_ada: boolean }) => t.ticker !== null && !t.is_ada)
+        .map((t: { ticker: string | null }) => String(t.ticker).toUpperCase()))));
+    const adaInfo = await getAdaUsdCached();
+    const usdByTicker = await getUsdPricesForTickersCached(allTickers);
+    for (const wallet of walletRows) {
         try {
             console.log(`Processing wallet ${wallet.id}...`);
-            const { holdings, total_usd_value, is_using_fallback_rate, ada_usd } = await computeHoldingsForWallet(supabaseAdmin, wallet.id as string, wallet.address as string);
+            // backfill stake address if missing
+            if (!wallet.stake_address && wallet.address) {
+                try {
+                    const info = await koiosApi.post('/address_info', { _addresses: [wallet.address] });
+                    const resolved = Array.isArray(info.data) && info.data[0] && info.data[0].stake_address ? String(info.data[0].stake_address) : null;
+                    if (resolved) {
+                        await supabaseAdmin.from('wallets').update({ stake_address: resolved }).eq('id', wallet.id);
+                        wallet.stake_address = resolved;
+                    }
+                } catch {
+                    // ignore
+                }
+            }
+            const addrOrStake = wallet.stake_address || wallet.address || '';
+            const isStake = Boolean(wallet.stake_address);
+            const { holdings, total_usd_value, is_using_fallback_rate, ada_usd } = await computeHoldingsForWallet(
+                supabaseAdmin,
+                wallet.id as string,
+                addrOrStake,
+                isStake,
+                { adaUsd: adaInfo.price, isFallbackAda: adaInfo.isFallback, usdByTicker }
+            );
+
+            // Notify deviations vs targets if any exceed threshold
+            await notifyIfDeviationsExceedThreshold(
+                supabaseAdmin,
+                { id: wallet.id, name: wallet.name, threshold_percent: wallet.threshold_percent, config: wallet.config },
+                holdings,
+                total_usd_value
+            );
 
             // Get today's first snapshot if any
             const { data: todays, error: sErr } = await supabaseAdmin
