@@ -51,9 +51,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const tokenLabelsById: Record<string, string> = {};
         const tokenMetaById: Record<string, { ticker?: string | null; name?: string | null }> = {};
         for (const r of (targetsRows || [])) {
-            const label = (r.tokens?.ticker || r.tokens?.name || (r.tokens?.is_ada ? 'ADA' : 'Token')) as string;
+            const tokenRel = Array.isArray(r.tokens) ? (r.tokens[0] || null) : (r.tokens || null);
+            const label = (tokenRel?.ticker || tokenRel?.name || (tokenRel?.is_ada ? 'ADA' : 'Token')) as string;
             tokenLabelsById[r.token_id] = label;
-            tokenMetaById[r.token_id] = { ticker: r.tokens?.ticker || (r.tokens?.is_ada ? 'ADA' : null), name: r.tokens?.name || null };
+            tokenMetaById[r.token_id] = { ticker: tokenRel?.ticker || (tokenRel?.is_ada ? 'ADA' : null), name: tokenRel?.name || null };
         }
 
         // Build holdings restricted to portfolio tokens (same logic as holdings endpoint with portfolioOnly=true)
