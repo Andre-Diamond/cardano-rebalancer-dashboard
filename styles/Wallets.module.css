@@ -114,3 +114,82 @@
 .portfolioSummary {
     margin-top: 8px;
 }
+
+/* Modal styles */
+.modalBackdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal {
+    background: #111;
+    border-radius: 8px;
+    padding: 16px;
+    max-width: 720px;
+    width: 90%;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    color: #eee;
+}
+
+.modalHeader {
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.modalBody {
+    flex: 1;
+    overflow: auto;
+    margin-bottom: 12px;
+}
+
+.modalPre {
+    white-space: pre-wrap;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 12px;
+    line-height: 1.4;
+    margin: 0;
+    color: #ddd;
+}
+
+.modalActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.modalButton {
+    background: #222;
+    color: #eee;
+    border: 1px solid #333;
+    border-radius: 6px;
+    padding: 8px 12px;
+}
+
+.modalButton:hover {
+    background: #2a2a2a;
+}
+
+.modalButtonPrimary {
+    background: #2563eb;
+    color: #fff;
+    border: 1px solid #1e40af;
+    border-radius: 6px;
+    padding: 8px 12px;
+}
+
+.modalButtonPrimary:hover {
+    background: #1d4ed8;
+}
+
+.modalButton:disabled,
+.modalButtonPrimary:disabled {
+    opacity: 0.6;
+    cursor: default;
+}

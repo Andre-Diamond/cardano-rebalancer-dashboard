@@ -9,6 +9,7 @@ import WalletPortfolioSummary from './WalletPortfolioSummary';
 import HoldingsTable from './HoldingsTable';
 import WalletTargetsEditor from './WalletTargetsEditor';
 import WalletCharts from './WalletCharts';
+import { useMutation as useMutation2 } from 'react-query';
 
 export default function WalletCard({ wallet }: { wallet: Wallet }) {
     const { getHoldings, getPortfolio, getSnapshots, invalidatePortfolio, invalidateHoldings, invalidateWallets } = useData();
@@ -18,6 +19,8 @@ export default function WalletCard({ wallet }: { wallet: Wallet }) {
     const [showCharts, setShowCharts] = React.useState(false);
     const [portfolioRows, setPortfolioRows] = React.useState<PortfolioRow[] | null>(null);
     const [allHoldings, setAllHoldings] = React.useState<HoldingsResponse | null>(null);
+    const [rebalanceOpen, setRebalanceOpen] = React.useState(false);
+    const [rebalanceMessage, setRebalanceMessage] = React.useState<string>('');
 
     React.useEffect(() => {
         if (!editing) return;
@@ -161,6 +164,37 @@ export default function WalletCard({ wallet }: { wallet: Wallet }) {
         }
     });
 
+    const computeRebalance = useMutation2({
+        mutationFn: async () => {
+            const res = await apiRequest<{ ok: boolean; message: string }>(`/api/wallets/${wallet.id}/rebalance-plan`, { method: 'GET' });
+            return res;
+        },
+        onSuccess: (res) => {
+            toast.success('Rebalance plan computed');
+            setRebalanceMessage(res.message || '');
+            setRebalanceOpen(true);
+        },
+        onError: (e: unknown) => {
+            toast.error(e instanceof Error ? e.message : 'Failed to compute plan');
+        }
+    });
+
+    const sendRebalance = useMutation2({
+        mutationFn: async () => {
+            const res = await apiRequest<{ ok: boolean; message: string; sent: boolean }>(`/api/wallets/${wallet.id}/rebalance-plan?send=true`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ send: true })
+            });
+            return res;
+        },
+        onSuccess: (res) => {
+            toast.success(res.sent ? 'Rebalance plan sent to Discord' : 'Rebalance plan ready');
+            console.log(res.message);
+        },
+        onError: (e: unknown) => {
+            toast.error(e instanceof Error ? e.message : 'Failed to send plan');
+        }
+    });
+
     return (
         <div className={styles.walletCard}>
             <div className={styles.walletHeaderRow}>
@@ -171,6 +205,7 @@ export default function WalletCard({ wallet }: { wallet: Wallet }) {
                 <div className={styles.actions}>
                     <button onClick={() => syncTokens.mutate()} disabled={syncTokens.isLoading}>Sync Tokens</button>
                     <button onClick={() => snapshotWallet.mutate()} disabled={snapshotWallet.isLoading}>Take Snapshot</button>
+                    <button onClick={() => computeRebalance.mutate()} disabled={computeRebalance.isLoading}>Rebalance Plan</button>
                     <button onClick={() => setEditing(prev => !prev)}>
                         {editing ? 'Close Portfolio' : 'Edit Portfolio'}
                     </button>
@@ -214,6 +249,20 @@ export default function WalletCard({ wallet }: { wallet: Wallet }) {
                         globalThresholdPercent={globalThresholdPercent}
                         setGlobalThresholdPercent={setGlobalThresholdPercent}
                     />
+                </div>
+            )}
+            {rebalanceOpen && (
+                <div className={styles.modalBackdrop} onClick={() => setRebalanceOpen(false)}>
+                    <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+                        <div className={styles.modalHeader}>Rebalance Plan</div>
+                        <div className={styles.modalBody}>
+                            <pre className={styles.modalPre}>{rebalanceMessage || 'No plan available.'}</pre>
+                        </div>
+                        <div className={styles.modalActions}>
+                            <button className={styles.modalButton} onClick={() => setRebalanceOpen(false)}>Close</button>
+                            <button className={styles.modalButtonPrimary} onClick={() => sendRebalance.mutate()} disabled={sendRebalance.isLoading}>Send to Discord</button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
